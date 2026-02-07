@@ -1,0 +1,15 @@
+pycache/
+*.py[cod]
+.venv/
+*.egg-info/
+.dist/
+build/
+dist/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+data/*
+!data/sample/.keep
+runs/
+outputs/
+checkpoints/
