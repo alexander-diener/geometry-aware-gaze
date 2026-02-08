@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+title: "Geometry-Aware Gaze Estimation (Research Prototype)"
+message: "If you use this software, please cite it."
+type: software
+authors:
+  - family-names: Diener
+    given-names: Alexander
+repository-code: "https://github.com/alexander-diener/geometry-aware-gaze"
+keywords:
+  - gaze estimation
+  - computer vision
+  - geometry
+  - domain adaptation
+license: MIT
