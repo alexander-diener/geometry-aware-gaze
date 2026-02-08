@@ -1,5 +1,13 @@
 # Geometry-Aware Gaze Estimation (Research Prototype)
 
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+**Key artifacts**
+- `figures/domain_shift.png` – domain shift evaluation (A→A, A→B, B→B)
+- `figures/error_hist.png` – error distribution (baseline vs residual)
+- `figures/results.txt` – numeric summary
+
 This repository provides a **minimal, reproducible baseline** for gaze estimation that combines:
 1) a **geometry-inspired model** (head pose + relative eye angles), and  
 2) a **small learned residual correction** (MLP) to compensate for systematic biases / domain effects.
@@ -16,6 +24,16 @@ python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python -m src.cli --mode train
+```
+
+## Reproducibility
+The experiments are deterministic (fixed seeds). Run:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+python -m src.learning.train
 ```
 
 ## Results (synthetic demo)
@@ -70,3 +88,10 @@ limited and precision is critical.
 ## Portfolio note
 This repository is a compact research prototype created as part of my PhD application portfolio.
 It demonstrates geometry-aware inductive bias, clean experimental structure, and synthetic-to-real reasoning.
+
+```md
+## Roadmap (next steps)
+- Replace synthetic generator with a real gaze dataset and add evaluation protocols (angular error, calibration).
+- Add a lightweight feature extractor (e.g., eye crop encoding) and compare geometry-only vs geometry+features.
+- Extend to cross-species setting (apes) via anatomy-aware parameters + domain adaptation and synthetic 3D animal models.
+```
