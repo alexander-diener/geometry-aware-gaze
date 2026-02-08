@@ -1,2 +1,6 @@
-baseline_deg=2.674144
-geom_plus_residual_deg=1.745473
+A→A_baseline_deg=2.674786
+A→A_geom_plus_residual_deg=1.761140
+A→B_baseline_deg=4.335425
+A→B_geom_plus_residual_deg=4.438714
+B→B_baseline_deg=4.335425
+B→B_geom_plus_residual_deg=2.993503

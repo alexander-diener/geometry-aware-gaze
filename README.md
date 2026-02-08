@@ -28,6 +28,12 @@ residual can correct systematic biases.
 
 ![Error histogram](figures/error_hist.png)
 
+### Domain shift (synthetic)
+We simulate domain shift by changing systematic bias and observation noise between **Domain A** and **Domain B**.
+This mirrors common real-world issues (different cameras, subjects, illumination, annotation noise).
+
+![Domain shift](figures/domain_shift.png)
+
 ## Synthetic-to-real training pipeline
 The figure below summarizes a practical way to use synthetic data: **pretrain → adapt → evaluate**.
 
@@ -60,3 +66,7 @@ limited and precision is critical.
 **Pros:** scalable, cheap labels, perfect ground truth, controllable scenarios.  
 **Cons:** domain gap, unrealistic behavior/appearance, risk of learning artifacts.  
 **Best use:** pretrain/augment + domain randomization + fine-tune on real data + continuous real-world validation.
+
+## Portfolio note
+This repository is a compact research prototype created as part of my PhD application portfolio.
+It demonstrates geometry-aware inductive bias, clean experimental structure, and synthetic-to-real reasoning.
