@@ -1,0 +1,2 @@
+baseline_deg=2.674144
+geom_plus_residual_deg=1.745473
