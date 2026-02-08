@@ -4,25 +4,36 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **Key artifacts**
-- `figures/domain_shift.png` – domain shift evaluation (A→A, A→B, B→B)
+- `figures/domain_shift.png` – domain shift evaluation (A→A, A→B, B→B, OOD α)
 - `figures/error_hist.png` – error distribution (baseline vs residual)
+- `figures/ab_damping.png` – residual damping under domain shift
+- `figures/ood_alpha_hist.png` – OOD-based alpha distribution
 - `figures/results.txt` – numeric summary
 
-This repository provides a **minimal, reproducible baseline** for gaze estimation that combines:
-1) a **geometry-inspired model** (head pose + relative eye angles), and  
-2) a **small learned residual correction** (MLP) to compensate for systematic biases / domain effects.
+This repository provides a **minimal, fully reproducible research prototype** for gaze estimation that combines:
+1) a **geometry-inspired baseline** (head pose + relative eye angles), and  
+2) a **small learned residual correction** (MLP) that models systematic, domain-specific bias.
 
-The goal is to demonstrate **geometry-aware inductive bias** and a clean research workflow (setup → run → results).
+The goal is **not** to estimate gaze from images directly, but to **isolate and study** how geometry-aware inductive bias,
+residual learning, and domain shift interact in a controlled setting.
+
+---
 
 ## Why geometry (context)
-Generic large vision foundation models are often optimized for semantic invariances and may underutilize subtle, geometry-sensitive cues.  
-For gaze estimation, **small angular differences matter**; geometry-aware baselines can be strong and sample-efficient, and learning can be used to model residual errors.
+Generic large vision foundation models are often optimized for semantic invariances and may underutilize subtle,
+geometry-sensitive cues.  
+For gaze estimation, **small angular errors matter**; geometry-aware baselines are strong, interpretable,
+and sample-efficient. Learning is then best used to correct **systematic residual errors**, not to replace geometry.
+
+---
 
 ## Research context (short)
-- Synthetic data is used to provide controlled ground truth for early-stage model development.
-- Geometry baseline captures essential relationships (head/eye → gaze), improved via learned residual.
-- Domain shift illustrates typical challenges when deployed across varying conditions.
-- This prototype is a foundation for future extension to real datasets and cross-species gaze estimation.
+- Synthetic data provides **controlled ground truth** and enables clean ablation studies.
+- Geometry captures the core physical relationship (head/eye → gaze).
+- Learned residuals correct **domain-specific bias**.
+- Domain shift exposes when and why residual learning can fail (negative transfer).
+
+---
 
 ## Quickstart
 ```bash
@@ -32,97 +43,143 @@ pip install -r requirements.txt
 python -m src.cli --mode train
 ```
 
+---
+
 ## Reproducibility
-The experiments are deterministic (fixed seeds). Run:
+All experiments are deterministic (fixed random seeds).
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
 python -m src.learning.train
 ```
 
-## Results (synthetic demo)
-The synthetic experiment demonstrates that a geometry-inspired baseline can be strong, and that a small learned
-residual can correct systematic biases.
+Expected outputs:
+- `figures/error_hist.png`
+- `figures/domain_shift.png`
+- `figures/ab_damping.png`
+- `figures/ood_alpha_hist.png`
+- `figures/results.txt`
 
-**Files:**
-- `figures/results.txt` (numbers)
-- `figures/error_hist.png` (distribution)
+---
+
+## Results (synthetic demo)
 
 ### Quantitative summary
 
-Here are the mean angular errors (degrees) from synthetic evaluation:
+Mean angular error (degrees), extracted from `figures/results.txt`:
 
-| Evaluation setting | Baseline (deg) | Geometry + Learned (deg)  |
-|--------------------|----------------|---------------------------|
-| A → A              | 2.675          | 1.761                     |
-| A → B              | 4.335          | 4.439                     |
-| B → B              | 4.335          | 2.993                     |
+| Evaluation setting | Baseline (deg) | Geometry + Residual (deg) |
+|--------------------|----------------|----------------------------|
+| A → A              | 3.150          | **1.789**                  |
+| A → B              | 5.280          | **4.410**                  |
+| B → B              | 5.280          | **3.015**                  |
+| A → B (OOD α)      | 5.280          | **4.424**                  |
 
-*(Values extracted from `figures/results.txt`)*
+**Observations**
+- Residual learning yields a **large improvement within domain** (A→A, B→B).
+- Under domain shift (A→B), the residual still helps, but less.
+- OOD-based α behaves similarly to α≈1 because most samples remain close to the training domain in feature space.
 
-This table shows that learning a residual correction improves performance within domain and can partially mitigate domain shift.
+---
+
+### Error distribution (A→A)
 
 ![Error histogram](figures/error_hist.png)
 
-### Domain shift (synthetic)
-We simulate domain shift by changing systematic bias and observation noise between **Domain A** and **Domain B**.
-This mirrors common real-world issues (different cameras, subjects, illumination, annotation noise).
+The histogram shows that residual learning:
+- shifts the entire error distribution toward lower angular error,
+- reduces large-error outliers,
+- not just improves the mean.
+
+---
+
+## Domain shift analysis
 
 ![Domain shift](figures/domain_shift.png)
 
-### Residual damping under domain shift (A→B)
-A residual model trained on Domain A can **overcorrect** on Domain B (negative transfer).  
-We mitigate this by damping the residual: **prediction = geometry + α · residual**.
+This experiment simulates domain shift by changing:
+- systematic bias functions,
+- observation noise levels.
+
+This mirrors real-world changes such as camera setup, subject population, or annotation quality.
+
+---
+
+## Residual damping under domain shift (A→B)
 
 ![A→B damping](figures/ab_damping.png)
 
-### Automatic residual damping via uncertainty (MC dropout)
-Under domain shift, a residual trained on Domain A can overcorrect on Domain B.  
-We estimate prediction uncertainty using **MC dropout** and set **α(x) = 1 / (1 + k·Var(residual))**.  
-Higher uncertainty → smaller α → safer reliance on geometry.
+A residual model trained on Domain A can **overcorrect** on Domain B (negative transfer).
+We therefore study **residual damping**:
 
-![Auto alpha histogram](figures/auto_alpha_hist.png)
+> **prediction = geometry + α · residual**
+
+Key insight:
+- α = 0 → pure geometry (safe but less accurate)
+- α = 1 → full residual (best when domains match)
+- intermediate α trades off robustness vs adaptation
+
+---
+
+## Automatic residual damping via OOD distance (A→B)
+
+![OOD alpha](figures/ood_alpha_hist.png)
+
+We estimate an **out-of-distribution (OOD) score** using Mahalanobis distance in feature space
+(head pose + noisy eye angles).  
+α(x) decays for samples far from the training domain.
+
+**Important observation (honest result):**
+- In this synthetic setup, most A→B samples remain close to Domain A.
+- As a result, α ≈ 1 for most samples, and OOD-based damping behaves similarly to α=1.
+
+This highlights a key research insight:
+
+> **Residual uncertainty alone is insufficient to detect domain shift when the model is confidently wrong.**
+
+---
 
 ## Synthetic-to-real training pipeline
-The figure below summarizes a practical way to use synthetic data: **pretrain → adapt → evaluate**.
 
 ![Pipeline](figures/pipeline.png)
 
-**Legend:**
-1. **Synthetic pretraining:** train on large-scale synthetic scenes with precise ground-truth gaze/head-pose labels.
-2. **Domain adaptation:** reduce domain gap using a mixture of synthetic+real data (fine-tuning, feature alignment, etc.).
-3. **Real-world evaluation:** evaluate on real benchmarks to measure generalization.
+**Legend**
+1. **Synthetic pretraining:** learn geometry-aware structure with perfect labels.
+2. **Adaptation:** learn residual corrections for systematic bias.
+3. **Deployment:** detect and mitigate domain shift via damping or domain adaptation.
 
-## Short research notes (aligned with UniGaze-style insights)
-### Why generic large foundation models may underperform on gaze estimation
-Gaze estimation is **fine-grained and geometry-sensitive**. Generic foundation models are often optimized for semantic
-invariances and global representations, which can underutilize subtle cues (eye region appearance, small head pose changes,
-camera geometry). Task-specific inductive biases and geometry-aware modeling can outperform generic pretraining when data is
-limited and precision is critical.
+---
 
-### Extending gaze estimation to apes (high-level plan)
-- Use **anatomy-aware geometry** (species-specific eye/head parameters).
-- Train with **shared backbone + species-specific heads**.
-- Apply **domain adaptation** to align human/ape representations.
-- Use **synthetic 3D animal models** + domain randomization to compensate for limited real annotations.
+## Research notes (aligned with UniGaze-style insights)
 
-### Human subject video data: typical issues and mitigation
-- Privacy/consent & legal constraints → strong governance, consent, anonymization.
-- Demographic bias → balanced datasets, bias evaluation.
-- Annotation noise → probabilistic labels, multi-stage supervision, quality control.
+### Why generic foundation models may underperform
+Gaze estimation is **fine-grained and geometry-sensitive**.
+Generic models prioritize invariance, while gaze requires sensitivity to small angular changes
+and camera geometry.
 
-### Synthetic data for multi-human gaze detection: pros/cons and best use
-**Pros:** scalable, cheap labels, perfect ground truth, controllable scenarios.  
-**Cons:** domain gap, unrealistic behavior/appearance, risk of learning artifacts.  
-**Best use:** pretrain/augment + domain randomization + fine-tune on real data + continuous real-world validation.
+### Extending to apes (high-level plan)
+- Anatomy-aware geometry parameters.
+- Shared backbone with species-specific heads.
+- Synthetic 3D animal models + domain randomization.
+
+### Human subject video data: challenges
+- Privacy and consent.
+- Demographic bias.
+- Noisy annotations.
+
+### Synthetic data: pros and cons
+**Pros:** scalable, controllable, perfect labels.  
+**Cons:** domain gap, unrealistic correlations.  
+**Best use:** pretraining + adaptation + real-data validation.
+
+---
 
 ## Portfolio note
-This repository is a compact research prototype created as part of my PhD application portfolio.
-It demonstrates geometry-aware inductive bias, clean experimental structure, and synthetic-to-real reasoning.
+This repository was created as part of my PhD application portfolio.
+It demonstrates **geometry-aware inductive bias**, **controlled experimentation**, and **honest analysis of domain shift**.
 
-## Roadmap (next steps)
-- Replace synthetic generator with a real gaze dataset and add evaluation protocols (angular error, calibration).
-- Add a lightweight feature extractor (e.g., eye crop encoding) and compare geometry-only vs geometry+features.
-- Extend to cross-species setting (apes) via anatomy-aware parameters + domain adaptation and synthetic 3D animal models.
+---
+
+## Roadmap
+- Add image-based feature extraction (eye crops → angles).
+- Study confidence calibration for residual gating.
+- Evaluate on real gaze datasets.
