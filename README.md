@@ -72,6 +72,12 @@ This mirrors common real-world issues (different cameras, subjects, illumination
 
 ![Domain shift](figures/domain_shift.png)
 
+### Residual damping under domain shift (A→B)
+A residual model trained on Domain A can **overcorrect** on Domain B (negative transfer).  
+We mitigate this by damping the residual: **prediction = geometry + α · residual**.
+
+![A→B damping](figures/ab_damping.png)
+
 ## Synthetic-to-real training pipeline
 The figure below summarizes a practical way to use synthetic data: **pretrain → adapt → evaluate**.
 
@@ -109,9 +115,7 @@ limited and precision is critical.
 This repository is a compact research prototype created as part of my PhD application portfolio.
 It demonstrates geometry-aware inductive bias, clean experimental structure, and synthetic-to-real reasoning.
 
-```md
 ## Roadmap (next steps)
 - Replace synthetic generator with a real gaze dataset and add evaluation protocols (angular error, calibration).
 - Add a lightweight feature extractor (e.g., eye crop encoding) and compare geometry-only vs geometry+features.
 - Extend to cross-species setting (apes) via anatomy-aware parameters + domain adaptation and synthetic 3D animal models.
-```

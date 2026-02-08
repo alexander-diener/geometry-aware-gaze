@@ -65,11 +65,11 @@ def mean_ang_err_deg(pred_vec: np.ndarray, true_vec: np.ndarray) -> float:
     return float(angular_error_deg(pred_vec, true_vec).mean())
 
 
-def eval_bundle(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray, model: ResidualMLP):
+def eval_bundle(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray, model: ResidualMLP, alpha: float = 1.0):
     """
     Returns mean error for:
     - geometry baseline
-    - geometry + learned residual
+    - geometry + alpha * learned residual
     """
     base_err = mean_ang_err_deg(base_vec, true_vec)
 
@@ -80,8 +80,8 @@ def eval_bundle(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray, model
 
     head_yaw, head_pitch, eye_yaw_obs, eye_pitch_obs = x.T
     pred_vec = yaw_pitch_to_unit(
-        head_yaw + eye_yaw_obs + res[:, 0],
-        head_pitch + eye_pitch_obs + res[:, 1],
+        head_yaw + eye_yaw_obs + alpha * res[:, 0],
+        head_pitch + eye_pitch_obs + alpha * res[:, 1],
     )
     pred_err = mean_ang_err_deg(pred_vec, true_vec)
     return base_err, pred_err
@@ -133,6 +133,23 @@ def plot_domain_shift(results, out_path: str):
     plt.savefig(out_path, dpi=200)
     plt.close()
 
+def plot_ab_damping(ab_sweep, out_path: str):
+    import matplotlib.pyplot as plt
+    alphas = sorted(ab_sweep.keys())
+    baseline = [ab_sweep[a][0] for a in alphas]
+    pred = [ab_sweep[a][1] for a in alphas]
+
+    plt.figure()
+    plt.plot(alphas, baseline, marker="o", label="Geometry baseline (A→B)")
+    plt.plot(alphas, pred, marker="o", label="Geometry + alpha·residual (A→B)")
+    plt.xlabel("alpha")
+    plt.ylabel("Mean angular error (deg)")
+    plt.title("Damping residual under domain shift (A→B)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
 
 def main():
     os.makedirs("figures", exist_ok=True)
@@ -151,6 +168,13 @@ def main():
     res = {}
     res["A→A"] = eval_bundle(xA_te, baseA_te, trueA_te, modelA)
     res["A→B"] = eval_bundle(xB_te, baseB_te, trueB_te, modelA)
+    
+     # Damping sweep for domain shift A→B
+    alphas = [0.0, 0.25, 0.5, 0.75, 1.0]
+    ab_sweep = {}
+    for a in alphas:
+        b, p = eval_bundle(xB_te, baseB_te, trueB_te, modelA, alpha=a)
+        ab_sweep[a] = (b, p)
 
     # Optional: also train on B (to show within-domain)
     xB_tr, yB_tr, baseB_tr, trueB_tr = make_synth(n_train, seed=4, domain="B")
@@ -162,6 +186,10 @@ def main():
         for k, (b, p) in res.items():
             f.write(f"{k}_baseline_deg={b:.6f}\n")
             f.write(f"{k}_geom_plus_residual_deg={p:.6f}\n")
+        f.write("\n# A→B damping sweep (alpha)\n")
+        for a, (b, p) in ab_sweep.items():
+            f.write(f"A→B_alpha={a:.2f}_baseline_deg={b:.6f}\n")
+            f.write(f"A→B_alpha={a:.2f}_geom_plus_residual_deg={p:.6f}\n")
 
     # Keep the previous histogram for A→A (nice distribution view)
     base_err = angular_error_deg(baseA_te, trueA_te)
@@ -186,6 +214,7 @@ def main():
 
     # New domain shift plot
     plot_domain_shift(res, "figures/domain_shift.png")
+    plot_ab_damping(ab_sweep, "figures/ab_damping.png")
 
     print("Domain shift results:")
     for k, (b, p) in res.items():
