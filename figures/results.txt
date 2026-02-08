@@ -1,18 +1,22 @@
 A→A_baseline_deg=2.674786
-A→A_geom_plus_residual_deg=1.761140
+A→A_geom_plus_residual_deg=1.788611
 A→B_baseline_deg=4.335425
-A→B_geom_plus_residual_deg=4.438714
+A→B_geom_plus_residual_deg=4.410255
+A→B (auto α)_baseline_deg=4.335425
+A→B (auto α)_geom_plus_residual_deg=4.425447
 B→B_baseline_deg=4.335425
-B→B_geom_plus_residual_deg=2.993503
+B→B_geom_plus_residual_deg=3.028602
 
 # A→B damping sweep (alpha)
 A→B_alpha=0.00_baseline_deg=4.335425
 A→B_alpha=0.00_geom_plus_residual_deg=5.279719
 A→B_alpha=0.25_baseline_deg=4.335425
-A→B_alpha=0.25_geom_plus_residual_deg=4.960943
+A→B_alpha=0.25_geom_plus_residual_deg=4.979879
 A→B_alpha=0.50_baseline_deg=4.335425
-A→B_alpha=0.50_geom_plus_residual_deg=4.711093
+A→B_alpha=0.50_geom_plus_residual_deg=4.732163
 A→B_alpha=0.75_baseline_deg=4.335425
-A→B_alpha=0.75_geom_plus_residual_deg=4.536648
+A→B_alpha=0.75_geom_plus_residual_deg=4.541666
 A→B_alpha=1.00_baseline_deg=4.335425
-A→B_alpha=1.00_geom_plus_residual_deg=4.438714
+A→B_alpha=1.00_geom_plus_residual_deg=4.410255
+A→B_auto_alpha_mean=0.998822
+A→B_auto_var_mean=0.000039

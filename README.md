@@ -78,6 +78,13 @@ We mitigate this by damping the residual: **prediction = geometry + α · residu
 
 ![A→B damping](figures/ab_damping.png)
 
+### Automatic residual damping via uncertainty (MC dropout)
+Under domain shift, a residual trained on Domain A can overcorrect on Domain B.  
+We estimate prediction uncertainty using **MC dropout** and set **α(x) = 1 / (1 + k·Var(residual))**.  
+Higher uncertainty → smaller α → safer reliance on geometry.
+
+![Auto alpha histogram](figures/auto_alpha_hist.png)
+
 ## Synthetic-to-real training pipeline
 The figure below summarizes a practical way to use synthetic data: **pretrain → adapt → evaluate**.
 

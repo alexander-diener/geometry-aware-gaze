@@ -64,6 +64,34 @@ def make_synth(n: int, seed: int, domain: str):
 def mean_ang_err_deg(pred_vec: np.ndarray, true_vec: np.ndarray) -> float:
     return float(angular_error_deg(pred_vec, true_vec).mean())
 
+def mc_dropout_residual(model: ResidualMLP, x: np.ndarray, n_mc: int = 20):
+    """
+    Returns mean residual and per-sample uncertainty (variance proxy) via MC dropout.
+    """
+    model.train()  # IMPORTANT: keep dropout active
+    xt = torch.from_numpy(x)
+
+    preds = []
+    with torch.no_grad():
+        for _ in range(n_mc):
+            preds.append(model(xt).numpy())
+    preds = np.stack(preds, axis=0)  # [n_mc, N, 2]
+
+    mean = preds.mean(axis=0)        # [N, 2]
+    var = preds.var(axis=0).mean(axis=1)  # [N] mean variance over yaw/pitch
+    return mean, var
+
+
+def uncertainty_to_alpha(var: np.ndarray, k: float = 30.0, floor: float = 0.0):
+    """
+    Map uncertainty (variance) to alpha in [floor, 1].
+    Higher variance -> smaller alpha.
+    alpha = 1 / (1 + k * var)
+    """
+    alpha = 1.0 / (1.0 + k * var)
+    if floor > 0:
+        alpha = np.maximum(alpha, floor)
+    return alpha
 
 def eval_bundle(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray, model: ResidualMLP, alpha: float = 1.0):
     """
@@ -86,6 +114,23 @@ def eval_bundle(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray, model
     pred_err = mean_ang_err_deg(pred_vec, true_vec)
     return base_err, pred_err
 
+def eval_bundle_auto_alpha(x: np.ndarray, base_vec: np.ndarray, true_vec: np.ndarray,
+                           model: ResidualMLP, n_mc: int = 20, k: float = 30.0):
+    """
+    Geometry baseline vs geometry + alpha(x)*residual where alpha is derived from MC-dropout uncertainty.
+    """
+    base_err = mean_ang_err_deg(base_vec, true_vec)
+
+    mean_res, var = mc_dropout_residual(model, x, n_mc=n_mc)
+    alpha = uncertainty_to_alpha(var, k=k, floor=0.0)
+
+    head_yaw, head_pitch, eye_yaw_obs, eye_pitch_obs = x.T
+    pred_vec = yaw_pitch_to_unit(
+        head_yaw + eye_yaw_obs + alpha * mean_res[:, 0],
+        head_pitch + eye_pitch_obs + alpha * mean_res[:, 1],
+    )
+    pred_err = mean_ang_err_deg(pred_vec, true_vec)
+    return base_err, pred_err, float(alpha.mean()), float(var.mean())
 
 def train_model(x_tr: np.ndarray, y_tr: np.ndarray, epochs: int = 6) -> ResidualMLP:
     ds = TensorDataset(torch.from_numpy(x_tr), torch.from_numpy(y_tr))
@@ -150,6 +195,17 @@ def plot_ab_damping(ab_sweep, out_path: str):
     plt.tight_layout()
     plt.savefig(out_path, dpi=200)
     plt.close()
+    
+def plot_alpha_hist(alpha: np.ndarray, out_path: str):
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.hist(alpha, bins=60, alpha=0.85)
+    plt.xlabel("alpha")
+    plt.ylabel("count")
+    plt.title("Uncertainty-aware alpha distribution (A→B)")
+    plt.tight_layout()
+    plt.savefig(out_path, dpi=200)
+    plt.close()
 
 def main():
     os.makedirs("figures", exist_ok=True)
@@ -169,7 +225,18 @@ def main():
     res["A→A"] = eval_bundle(xA_te, baseA_te, trueA_te, modelA)
     res["A→B"] = eval_bundle(xB_te, baseB_te, trueB_te, modelA)
     
-     # Damping sweep for domain shift A→B
+    # Uncertainty-aware automatic alpha for A→B
+    b_auto, p_auto, alpha_mean, var_mean = eval_bundle_auto_alpha(
+        xB_te, baseB_te, trueB_te, modelA, n_mc=20, k=30.0
+    )
+    res["A→B (auto α)"] = (b_auto, p_auto)
+    
+    # Recompute alpha for plotting
+    mean_res, var = mc_dropout_residual(modelA, xB_te, n_mc=20)
+    alpha = uncertainty_to_alpha(var, k=30.0)
+    plot_alpha_hist(alpha, "figures/auto_alpha_hist.png")
+    
+    # Damping sweep for domain shift A→B
     alphas = [0.0, 0.25, 0.5, 0.75, 1.0]
     ab_sweep = {}
     for a in alphas:
@@ -190,6 +257,8 @@ def main():
         for a, (b, p) in ab_sweep.items():
             f.write(f"A→B_alpha={a:.2f}_baseline_deg={b:.6f}\n")
             f.write(f"A→B_alpha={a:.2f}_geom_plus_residual_deg={p:.6f}\n")
+        f.write(f"A→B_auto_alpha_mean={alpha_mean:.6f}\n")
+        f.write(f"A→B_auto_var_mean={var_mean:.6f}\n")
 
     # Keep the previous histogram for A→A (nice distribution view)
     base_err = angular_error_deg(baseA_te, trueA_te)

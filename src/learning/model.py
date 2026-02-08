@@ -3,16 +3,18 @@ import torch.nn as nn
 
 class ResidualMLP(nn.Module):
     """
-    Predicts small residual correction (delta_yaw, delta_pitch) on top of geometry baseline.
-    Input features: [head_yaw, head_pitch, eye_yaw, eye_pitch]
+    Predicts small residual correction (delta_yaw, delta_pitch).
+    Includes dropout to enable MC-dropout uncertainty at inference time.
     """
-    def __init__(self, hidden: int = 64):
+    def __init__(self, hidden: int = 64, p_drop: float = 0.15):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(4, hidden),
             nn.ReLU(),
+            nn.Dropout(p_drop),
             nn.Linear(hidden, hidden),
             nn.ReLU(),
+            nn.Dropout(p_drop),
             nn.Linear(hidden, 2),
         )
 
